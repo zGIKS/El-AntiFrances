@@ -2,176 +2,140 @@ import csv
 from collections import deque
 
 class Process:
-    def __init__(self, pid, priority, burst_time):
-        self.pid = pid                        # Process ID
-        self.priority = priority              # Priority (lower value = higher priority)
-        self.burst_time = burst_time          # Total execution time needed
-        self.remaining_time = burst_time      # Remaining execution time
-        self.finished = False                 # Flag to indicate if process is finished
-        self.first_execution = None           # Time when process first started executing
+    def __init__(self, pid, priority, burst_time, arrival_time=0):
+        self.pid = pid
+        self.priority = priority
+        self.burst_time = burst_time
+        self.remaining_time = burst_time
+        self.finished = False
+        self.first_execution = None
+        self.arrival_time = arrival_time
 
 def round_robin_scheduler(processes, time_quantum):
-    """
-    Simulates Round Robin scheduling algorithm and tracks process states.
-    
-    Args:
-        processes: List of Process objects
-        time_quantum: Time quantum for each process
-        
-    Returns:
-        state_timeline: List of dictionaries with process states at each time unit
-    """
-    # Create a copy of processes to avoid modifying the original
-    process_copies = [Process(p.pid, p.priority, p.burst_time) for p in processes]
-    
-    # Keep track of process states at each time unit
+    process_copies = [Process(p.pid, p.priority, p.burst_time, p.arrival_time) for p in processes]
     state_timeline = []
     current_time = 0
-    ready_queue = deque(process_copies)
-    
-    # Dictionary to map process ID to its object for quick lookup
-    process_map = {p.pid: p for p in process_copies}
-    
-    # Track which processes have arrived in the system
-    arrived_processes = set()
-    
-    # Track if we need to add an F for a process in the next state
-    mark_finished = {}
-    
-    while ready_queue:
-        current_process = ready_queue.popleft()
-        arrived_processes.add(current_process.pid)
-        
-        # If this is the first time this process is executing, record the start time
-        if current_process.first_execution is None:
-            current_process.first_execution = current_time
-        
-        # Process executes for time_quantum or until completion
-        execution_time = min(time_quantum, current_process.remaining_time)
-        
-        for t in range(execution_time):
-            # Create state snapshot for this time unit
+    ready_queue = deque()
+    waiting = sorted(process_copies, key=lambda p: p.arrival_time)  # procesos por llegar
+    process_completion = {}  # Almacena cuándo termina cada proceso para mostrar F
+
+    while ready_queue or waiting:
+        # Añadir procesos que han llegado
+        while waiting and waiting[0].arrival_time <= current_time:
+            ready_queue.append(waiting.pop(0))
+
+        if not ready_queue:
+            # No hay procesos listos, avanzar tiempo
+            state = {}
+            for p in process_copies:
+                if p.pid in process_completion and process_completion[p.pid] == current_time:
+                    state[p.pid] = 'F'  # Mostrar F en el momento exacto de finalización
+                elif p.finished:
+                    state[p.pid] = ''  # Ya ha terminado
+                else:
+                    state[p.pid] = ''  # Aún no ha llegado
+            state_timeline.append(state)
+            current_time += 1
+            continue
+
+        process = ready_queue.popleft()
+
+        if process.first_execution is None:
+            process.first_execution = current_time
+
+        execution_time = min(time_quantum, process.remaining_time)
+
+        for i in range(execution_time):
+            # Añadir procesos que llegaron en este tick
+            while waiting and waiting[0].arrival_time <= current_time:
+                ready_queue.append(waiting.pop(0))
+
+            # Preparar el estado para este tick
             state = {}
             
-            # First, handle any process that needs to be marked as finished
-            for pid, should_mark in list(mark_finished.items()):
-                if should_mark:
-                    state[pid] = 'F'
-                    mark_finished[pid] = False  # Only mark once
-                    process_map[pid].finished = True
-                elif process_map[pid].finished:
-                    state[pid] = ''  # Process already finished
-            
-            # Now handle the current process and other processes
             for p in process_copies:
-                if p.pid in state:
-                    continue  # Already handled
-                
-                if p.pid == current_process.pid:
-                    state[p.pid] = 'E'  # Process is executing
-                    
-                    # Check if this execution will finish the process
-                    if current_process.remaining_time == 1:  # This is the last execution unit
-                        # Mark to add an F in the next state
-                        mark_finished[p.pid] = True
+                # Procesar la marca F para los procesos que terminaron exactamente en este momento
+                if p.pid in process_completion and process_completion[p.pid] == current_time:
+                    state[p.pid] = 'F'
                 elif p.finished:
-                    state[p.pid] = ''  # Process already finished
-                elif p.pid in arrived_processes:
-                    state[p.pid] = 'L'  # Process is waiting in queue
+                    state[p.pid] = ''  # Ya ha terminado
+                elif p.pid == process.pid:
+                    # Último tick de ejecución del proceso actual
+                    if i == execution_time - 1 and process.remaining_time == 1:
+                        # Marcar este momento para mostrar F después
+                        process_completion[p.pid] = current_time + 1
+                        state[p.pid] = 'E'  # Aún ejecutando en este tick
+                    else:
+                        state[p.pid] = 'E'  # Ejecutando normalmente
+                elif p.arrival_time <= current_time and not p.finished:
+                    state[p.pid] = 'L'  # Esperando
                 else:
-                    state[p.pid] = ''   # Process hasn't arrived yet
+                    state[p.pid] = ''  # No ha llegado todavía
             
             state_timeline.append(state)
+            process.remaining_time -= 1
+            current_time += 1
             
-            # Decrease remaining time of current process
-            current_process.remaining_time -= 1
-        
-        current_time += execution_time
-        
-        # If process is not marked for finishing, add it back to the queue
-        if current_process.remaining_time > 0:
-            ready_queue.append(current_process)
-    
-    # Add one final state if any process needs to be marked as finished
-    if any(mark_finished.values()):
-        final_state = {}
-        for pid, should_mark in mark_finished.items():
-            if should_mark:
-                final_state[pid] = 'F'
-            elif process_map[pid].finished:
-                final_state[pid] = ''
-            else:
-                final_state[pid] = 'L'
-        
-        for p in process_copies:
-            if p.pid not in final_state:
-                if p.finished:
-                    final_state[p.pid] = ''
-                else:
-                    final_state[p.pid] = 'L'
-        
-        state_timeline.append(final_state)
-    
+            # Verificar si el proceso ha terminado
+            if process.remaining_time == 0:
+                process.finished = True
+                break
+
+        # Añadir proceso de vuelta a la cola si no ha terminado
+        if process.remaining_time > 0:
+            ready_queue.append(process)
+
+    # Asegurarse de que todos los procesos tengan su marca F
+    for pid, finish_time in process_completion.items():
+        # Si el tiempo de finalización está fuera del timeline actual
+        if finish_time >= len(state_timeline):
+            # Añadir un estado más con la marca F
+            final_state = {p.pid: '' for p in process_copies}
+            final_state[pid] = 'F'
+            state_timeline.append(final_state)
+        else:
+            # Marcar F en el momento correspondiente
+            state_timeline[finish_time][pid] = 'F'
+
     return state_timeline
 
 def generate_gantt_csv(state_timeline, processes, filename="gantt_chart.csv"):
-    """
-    Generates a CSV file representing the Gantt chart in horizontal format.
-    
-    States:
-    - 'E' for executing
-    - 'L' for waiting
-    - '' for not started
-    - 'F' for finished
-    """
-    # Create header row with time units
     header = ['Process'] + [str(t) for t in range(len(state_timeline))]
-    
-    # Create the data matrix for CSV
     csv_data = [header]
-    
+
     for p in processes:
         row = [f'P{p.pid}']
         for t in range(len(state_timeline)):
             row.append(state_timeline[t][p.pid])
         csv_data.append(row)
-    
-    # Write to CSV
+
     with open(filename, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         for row in csv_data:
             writer.writerow(row)
-    
+
     return filename
 
 def main():
-    # Predefined dataset
+    # Datos predefinidos según la imagen proporcionada
     processes = [
-        Process(1, 0, 7),  # P1: priority 0, burst time 7
-        Process(2, 1, 3),  # P2: priority 1, burst time 3
-        Process(3, 2, 4),  # P3: priority 2, burst time 4
-        Process(4, 4, 2),  # P4: priority 4, burst time 2
-        Process(5, 5, 4)   # P5: priority 5, burst time 4
+        Process(1, 0, 7, arrival_time=0),   # P1: tiempo de ejecución 7, tiempo de llegada 0
+        Process(2, 0, 3, arrival_time=1),   # P2: tiempo de ejecución 3, tiempo de llegada 1
+        Process(3, 0, 4, arrival_time=2),   # P3: tiempo de ejecución 4, tiempo de llegada 2
+        Process(4, 0, 2, arrival_time=4),   # P4: tiempo de ejecución 2, tiempo de llegada 4
+        Process(5, 0, 4, arrival_time=5),   # P5: tiempo de ejecución 4, tiempo de llegada 5
     ]
-    
+
     time_quantum = 3
     print("Quantum:", time_quantum)
     
-    # Sort processes by priority (optional)
-    processes.sort(key=lambda p: p.priority)
-    
-    # Run the Round Robin algorithm
+    # El ordenamiento por tiempo de llegada se mantiene
+    processes.sort(key=lambda p: p.arrival_time)
     state_timeline = round_robin_scheduler(processes, time_quantum)
-    
-    # Generate CSV file
     output_file = generate_gantt_csv(state_timeline, processes)
     
-    print(f"\nGantt chart has been generated as '{output_file}'")
-    print("\nEstados en el diagrama:")
-    print("E: Proceso en ejecución")
-    print("L: Proceso en espera")
-    print("F: Proceso terminado")
-    print("(vacío): Proceso no iniciado")
+    print(f"\nGantt chart generado como '{output_file}'")
+    print("E: Ejecutando | L: Esperando | F: Finalizado")
 
 if __name__ == "__main__":
     main()
