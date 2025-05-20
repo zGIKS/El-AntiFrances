@@ -117,35 +117,38 @@ def generate_gantt_csv(state_timeline, processes, filename="gantt_chart.csv"):
     return filename
 
 def main():
-    # Manual input for processes
     try:
-        process_count = int(input("Ingrese la cantidad de procesos: "))
-        time_quantum = int(input("Ingrese el quantum de tiempo: "))
+        # Define the matrix with process data
+        # Each column represents a process: [arrival_time, execution_time]
+        process_matrix = [
+            # P1   P2   P3   P4   P5
+            [0,    1,   2,   3,   4],    # Tiempos de llegada
+            [5,    3,   8,   2,   4]     # Tiempos de ejecución
+        ]
         
-        if process_count <= 0 or time_quantum <= 0:
-            raise ValueError("La cantidad de procesos y el quantum deben ser mayores que cero")
-            
+        time_quantum = 2  # Quantum definido
+        
+        # Extraer datos de la matriz
+        num_processes = len(process_matrix[0])
         processes = []
         
-        print("\n--- Ingrese los datos para cada proceso ---")
-        for i in range(1, process_count + 1):
-            print(f"\nProceso P{i}:")
-            arrival_time = int(input(f"Tiempo de llegada para P{i}: "))
-            burst_time = int(input(f"Tiempo de ejecución para P{i}: "))
+        print("\nProcesos registrados desde la matriz:")
+        print("PID | Tiempo Llegada | Tiempo Ejecución")
+        print("----|----------------|----------------")
+        
+        for i in range(num_processes):
+            arrival_time = process_matrix[0][i]
+            burst_time = process_matrix[1][i]
             
             if burst_time <= 0 or arrival_time < 0:
-                raise ValueError("El tiempo de ejecución debe ser mayor que cero y el tiempo de llegada debe ser mayor o igual a cero")
+                raise ValueError(f"Error en datos del proceso P{i+1}: El tiempo de ejecución debe ser mayor que cero y el tiempo de llegada debe ser mayor o igual a cero")
                 
             # Usando un valor predeterminado para la prioridad ya que no se requiere
             priority = 0
-            processes.append(Process(i, priority, burst_time, arrival_time))
+            processes.append(Process(i+1, priority, burst_time, arrival_time))
+            print(f"P{i+1} | {arrival_time:14} | {burst_time:16}")
         
-        print("\nQuantum:", time_quantum)
-        print("\nProcesos registrados:")
-        print("PID | Tiempo Llegada | Tiempo Ejecución")
-        print("----|----------------|----------------")
-        for p in processes:
-            print(f"P{p.pid} | {p.arrival_time:14} | {p.burst_time:16}")
+        print(f"\nQuantum: {time_quantum}")
         
         # El ordenamiento por tiempo de llegada se mantiene
         processes.sort(key=lambda p: p.arrival_time)
@@ -157,7 +160,6 @@ def main():
     
     except ValueError as e:
         print(f"Error: {e}")
-        print("Por favor, ingrese valores numéricos válidos.")
     except Exception as e:
         print(f"Error inesperado: {e}")
 
