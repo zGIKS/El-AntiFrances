@@ -161,5 +161,90 @@ def main():
     except Exception as e:
         print(f"Error inesperado: {e}")
 
+def calcular_tiempos_desde_gantt(gantt_csv, tiempos_llegada, tiempos_ejecucion):
+    with open(gantt_csv, newline='') as csvfile:
+        reader = list(csv.reader(csvfile))
+        procesos = reader[1:]
+        resultados = []
+        for idx, row in enumerate(procesos):
+            llegada = tiempos_llegada[idx]
+            ejecucion = tiempos_ejecucion[idx]
+            # Buscar la última columna con 'E' o 'F'
+            fin = 0
+            for i in range(1, len(row)):
+                if row[i] in ('E', 'F'):
+                    fin = i
+            t_retorno = fin - llegada
+            t_espera = t_retorno - ejecucion
+            resultados.append({'retorno': t_retorno, 'espera': t_espera})
+        return resultados
+
+def mostrar_resultados_excel():
+    tiempos_llegada = [0, 1, 2, 4, 5]
+    tiempos_ejecucion = [7, 3, 4, 2, 4]
+    
+    # Calculando manualmente según el Gantt
+    # P1: termina en t=19, llegó en t=0 → retorno = 19
+    # P2: termina en t=6, llegó en t=1 → retorno = 5
+    # P3: termina en t=18, llegó en t=2 → retorno = 16
+    # P4: termina en t=14, llegó en t=4 → retorno = 10
+    # P5: termina en t=20, llegó en t=5 → retorno = 15
+    # Total: 19 + 5 + 16 + 10 + 15 = 65
+    # Promedio: 65/5 = 13.0
+    
+    resultados = calcular_tiempos_desde_gantt('gantt_chart.csv', tiempos_llegada, tiempos_ejecucion)
+    tiempos_retorno = [r['retorno'] for r in resultados]
+    tiempos_espera = [r['espera'] for r in resultados]
+    
+    print("\nCálculo detallado:")
+    print("PID | T. Llegada | T. Finalización | T. Retorno | T. Espera")
+    print("----|------------|-----------------|------------|----------")
+    
+    # Calcula manualmente los valores esperados
+    fin_p1 = 19  # Posición donde está 'F' para P1
+    fin_p2 = 6   # Posición donde está 'F' para P2
+    fin_p3 = 18  # Posición donde está 'F' para P3
+    fin_p4 = 14  # Posición donde está 'F' para P4
+    fin_p5 = 20  # Posición donde está 'F' para P5
+    
+    t_retorno_p1 = fin_p1 - tiempos_llegada[0]
+    t_retorno_p2 = fin_p2 - tiempos_llegada[1]
+    t_retorno_p3 = fin_p3 - tiempos_llegada[2]
+    t_retorno_p4 = fin_p4 - tiempos_llegada[3]
+    t_retorno_p5 = fin_p5 - tiempos_llegada[4]
+    
+    t_espera_p1 = t_retorno_p1 - tiempos_ejecucion[0]
+    t_espera_p2 = t_retorno_p2 - tiempos_ejecucion[1]
+    t_espera_p3 = t_retorno_p3 - tiempos_ejecucion[2]
+    t_espera_p4 = t_retorno_p4 - tiempos_ejecucion[3]
+    t_espera_p5 = t_retorno_p5 - tiempos_ejecucion[4]
+    
+    print(f"P1  | {tiempos_llegada[0]:10} | {fin_p1:15} | {t_retorno_p1:10} | {t_espera_p1:8}")
+    print(f"P2  | {tiempos_llegada[1]:10} | {fin_p2:15} | {t_retorno_p2:10} | {t_espera_p2:8}")
+    print(f"P3  | {tiempos_llegada[2]:10} | {fin_p3:15} | {t_retorno_p3:10} | {t_espera_p3:8}")
+    print(f"P4  | {tiempos_llegada[3]:10} | {fin_p4:15} | {t_retorno_p4:10} | {t_espera_p4:8}")
+    print(f"P5  | {tiempos_llegada[4]:10} | {fin_p5:15} | {t_retorno_p5:10} | {t_espera_p5:8}")
+    
+    # Calcular y mostrar los promedios manuales
+    tiempos_retorno_manual = [t_retorno_p1, t_retorno_p2, t_retorno_p3, t_retorno_p4, t_retorno_p5]
+    tiempos_espera_manual = [t_espera_p1, t_espera_p2, t_espera_p3, t_espera_p4, t_espera_p5]
+    
+    suma_retorno_manual = sum(tiempos_retorno_manual)
+    suma_espera_manual = sum(tiempos_espera_manual)
+    n = len(tiempos_retorno_manual)
+    
+    print(f"\nTiempos de retorno calculados manualmente: {tiempos_retorno_manual}")
+    print(f"Suma de tiempos de retorno: {suma_retorno_manual}")
+    print(f"T. medio de Retorno (manual): {suma_retorno_manual/n}")
+    print(f"T. medio de Espera (manual): {suma_espera_manual/n}")
+    
+    # Verificar si los tiempos del algoritmo coinciden
+    print(f"\nTiempos de retorno desde Gantt CSV: {tiempos_retorno}")
+    suma_retorno = sum(tiempos_retorno)
+    suma_espera = sum(tiempos_espera)
+    print(f"Suma de tiempos de retorno: {suma_retorno}")
+    print(f"T. medio de Retorno (CSV): {suma_retorno/n}")
+    print(f"T. medio de Espera (CSV): {suma_espera/n}")
+
 if __name__ == "__main__":
-    main()
+    mostrar_resultados_excel()
