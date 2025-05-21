@@ -18,6 +18,7 @@ def round_robin_scheduler(processes, time_quantum):
     ready_queue = deque()
     waiting = sorted(process_copies, key=lambda p: p.arrival_time)  # procesos por llegar
     process_completion = {}  # Almacena cuándo termina cada proceso para mostrar F
+    finish_times = {}  # Nuevo: almacena el tiempo de finalización real de cada proceso
 
     while ready_queue or waiting:
         # Añadir procesos que han llegado
@@ -52,52 +53,46 @@ def round_robin_scheduler(processes, time_quantum):
 
             # Preparar el estado para este tick
             state = {}
-            
             for p in process_copies:
-                # Procesar la marca F para los procesos que terminaron exactamente en este momento
                 if p.pid in process_completion and process_completion[p.pid] == current_time:
                     state[p.pid] = 'F'
                 elif p.finished:
-                    state[p.pid] = ''  # Ya ha terminado
+                    state[p.pid] = ''
                 elif p.pid == process.pid:
-                    # Último tick de ejecución del proceso actual
                     if i == execution_time - 1 and process.remaining_time == 1:
-                        # Marcar este momento para mostrar F después
                         process_completion[p.pid] = current_time + 1
-                        state[p.pid] = 'E'  # Aún ejecutando en este tick
+                        state[p.pid] = 'E'
                     else:
-                        state[p.pid] = 'E'  # Ejecutando normalmente
+                        state[p.pid] = 'E'
                 elif p.arrival_time <= current_time and not p.finished:
-                    state[p.pid] = 'L'  # Esperando
+                    state[p.pid] = 'L'
                 else:
-                    state[p.pid] = ''  # No ha llegado todavía
-            
+                    state[p.pid] = ''
             state_timeline.append(state)
             process.remaining_time -= 1
             current_time += 1
-            
-            # Verificar si el proceso ha terminado
             if process.remaining_time == 0:
                 process.finished = True
+                finish_times[process.pid] = current_time  # Guardar tiempo de finalización
                 break
-
-        # Añadir proceso de vuelta a la cola si no ha terminado
         if process.remaining_time > 0:
             ready_queue.append(process)
 
-    # Asegurarse de que todos los procesos tengan su marca F
     for pid, finish_time in process_completion.items():
-        # Si el tiempo de finalización está fuera del timeline actual
         if finish_time >= len(state_timeline):
-            # Añadir un estado más con la marca F
             final_state = {p.pid: '' for p in process_copies}
             final_state[pid] = 'F'
             state_timeline.append(final_state)
         else:
-            # Marcar F en el momento correspondiente
             state_timeline[finish_time][pid] = 'F'
 
-    return state_timeline
+    # Calcular tiempos de retorno y espera
+    resultados = []
+    for p in process_copies:
+        t_retorno = finish_times[p.pid] - p.arrival_time
+        t_espera = t_retorno - p.burst_time
+        resultados.append({'pid': p.pid, 'retorno': t_retorno, 'espera': t_espera})
+    return state_timeline, resultados
 
 def generate_gantt_csv(state_timeline, processes, filename="gantt_chart.csv"):
     header = ['Process'] + [str(t) for t in range(len(state_timeline))]
@@ -122,11 +117,11 @@ def main():
         # Each column represents a process: [arrival_time, execution_time]
         process_matrix = [
             # P1   P2   P3   P4   P5
-            [0,    1,   2,   3,   4],    # Tiempos de llegada
-            [5,    3,   8,   2,   4]     # Tiempos de ejecución
+            [0,    1,   2,   4,   5],    # Tiempos de llegada
+            [7,    3,   4,   2,   4]     # Tiempos de ejecución
         ]
         
-        time_quantum = 2  # Quantum definido
+        time_quantum = 3  # Quantum definido
         
         # Extraer datos de la matriz
         num_processes = len(process_matrix[0])
@@ -152,11 +147,24 @@ def main():
         
         # El ordenamiento por tiempo de llegada se mantiene
         processes.sort(key=lambda p: p.arrival_time)
-        state_timeline = round_robin_scheduler(processes, time_quantum)
+        state_timeline, resultados = round_robin_scheduler(processes, time_quantum)
         output_file = generate_gantt_csv(state_timeline, processes)
         
         print(f"\nGantt chart generado como '{output_file}'")
         print("E: Ejecutando | L: Esperando | F: Finalizado")
+
+        # Mostrar tiempos de retorno y espera
+        print("\nPID | T. Retorno | T. Espera")
+        print("----|------------|-----------")
+        suma_retorno = 0
+        suma_espera = 0
+        for r in resultados:
+            print(f"P{r['pid']}  | {r['retorno']!r} | {r['espera']!r}")
+            suma_retorno += r['retorno']
+            suma_espera += r['espera']
+        n = len(resultados)
+        print(f"\nT. medio de Retorno: {suma_retorno/n!r}")
+        print(f"T. medio de Espera: {suma_espera/n!r}")
     
     except ValueError as e:
         print(f"Error: {e}")
