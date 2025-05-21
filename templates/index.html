@@ -2,31 +2,33 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Calculadora Round Robin</title>
+    <title>Calculadora Round Robin (JS)</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         .excel-table input {
             width: 80px;
             text-align: center;
         }
-        .gantt-img {
-            max-width: 100%;
-            border: 1px solid #ccc;
+        .gantt-table td, .gantt-table th {
+            text-align: center;
+            min-width: 24px;
+            padding: 2px 4px;
         }
-        .csv-table {
-            margin-top: 20px;
-        }
+        .gantt-E { background: #4caf50 !important; color: #fff !important; }
+        .gantt-L { background: #ffc107 !important; color: #000 !important; }
+        .gantt-F { background: #e53935 !important; color: #fff !important; }
+        .gantt-empty { background: #f5f5f5; }
     </style>
 </head>
 <body class="bg-light">
 <div class="container py-4">
-    <h1 class="mb-4">Calculadora Round Robin</h1>
-    <form id="processForm" method="post" action="/" autocomplete="off">
+    <h1 class="mb-4">Calculadora Round Robin (JS)</h1>
+    <form id="processForm" autocomplete="off" onsubmit="event.preventDefault(); calcular();">
         <div class="mb-3">
             <label for="num_processes" class="form-label">Número de procesos:</label>
-            <input type="number" id="num_processes" name="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;">
+            <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;">
             <label for="quantum" class="form-label ms-3">Quantum:</label>
-            <input type="number" id="quantum" name="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;">
+            <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;">
             <button type="button" class="btn btn-secondary ms-3" onclick="updateTable()">Actualizar tabla</button>
         </div>
         <div class="excel-table">
@@ -38,65 +40,46 @@
                     <th>Tiempo de ejecución</th>
                 </tr>
                 </thead>
-                <tbody id="tableBody">
-                <!-- Rows will be inserted by JS -->
-                </tbody>
+                <tbody id="tableBody"></tbody>
             </table>
         </div>
         <button type="submit" class="btn btn-primary">Calcular</button>
     </form>
 
-    {% if results %}
-    <hr>
-    <h3>Resultados</h3>
-    <div class="mb-3">
-        <strong>Quantum óptimo:</strong> {{ results.quantum_optimo }} (AWT = {{ results.awt_optimo }})
+    <div id="resultados" style="display:none;">
+        <hr>
+        <h3>Resultados</h3>
+        <div class="mb-3">
+            <strong>Quantum óptimo:</strong> <span id="quantumOptimo"></span>
+        </div>
+        <div>
+            <strong>Comparativa de Quantum y su AWT:</strong>
+            <table class="table table-sm table-striped w-auto" id="tablaComparativa">
+                <thead><tr><th>Quantum</th><th>AWT</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div>
+            <strong>Tabla de resultados:</strong>
+            <table class="table table-bordered w-auto" id="tablaResultados">
+                <thead><tr><th>PID</th><th>CT</th><th>WT</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div>
+                <strong>T. medio de CT (ACT):</strong> <span id="act"></span><br>
+                <strong>T. medio de WT (AWT):</strong> <span id="awt"></span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <strong>Gantt Chart:</strong><br>
+            <div id="ganttChart"></div>
+        </div>
+        <div class="csv-table mt-4">
+            <strong>CSV (Gantt como tabla):</strong>
+            <button id="downloadCSV" class="btn btn-success btn-sm mb-2">Descargar CSV</button>
+            <div id="csvTable"></div>
+        </div>
     </div>
-    <div>
-        <strong>Comparativa de Quantum y su AWT:</strong>
-        <table class="table table-sm table-striped w-auto">
-            <thead><tr><th>Quantum</th><th>AWT</th></tr></thead>
-            <tbody>
-            {% for q, awt in results.resultados_quantum %}
-                <tr {% if q == results.quantum_optimo %}class="table-success"{% endif %}>
-                    <td>{{ q }}</td><td>{{ awt }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    <div>
-        <strong>Tabla de resultados:</strong>
-        <table class="table table-bordered w-auto">
-            <thead><tr><th>PID</th><th>CT</th><th>WT</th></tr></thead>
-            <tbody>
-            {% for r in results.resultados %}
-                <tr><td>P{{ r.pid }}</td><td>{{ r.retorno }}</td><td>{{ r.espera }}</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <div><strong>T. medio de CT (ACT):</strong> {{ results.act }}<br>
-        <strong>T. medio de WT (AWT):</strong> {{ results.awt }}</div>
-    </div>
-    <div class="mt-4">
-        <strong>Gantt Chart:</strong><br>
-        <img src="{{ url_for('static', filename='gantt.png') }}" class="gantt-img" alt="Gantt Chart">
-    </div>
-    <div class="csv-table mt-4">
-        <strong>CSV (Gantt como tabla):</strong>
-        <table class="table table-bordered table-sm w-auto">
-            <tbody>
-            {% for row in results.csv_data %}
-                <tr>
-                {% for cell in row %}
-                    <td>{{ cell }}</td>
-                {% endfor %}
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% endif %}
 </div>
 <script>
 function updateTable() {
@@ -113,6 +96,191 @@ function updateTable() {
     }
 }
 document.addEventListener('DOMContentLoaded', updateTable);
+
+function calcular() {
+    // Leer datos
+    let n = parseInt(document.getElementById('num_processes').value);
+    let quantum = parseInt(document.getElementById('quantum').value);
+    let arrivals = [], bursts = [];
+    for (let i = 0; i < n; i++) {
+        arrivals.push(parseInt(document.getElementsByName('arrival_' + i)[0].value));
+        bursts.push(parseInt(document.getElementsByName('burst_' + i)[0].value));
+    }
+    let processes = [];
+    for (let i = 0; i < n; i++) {
+        processes.push({pid: i+1, arrival: arrivals[i], burst: bursts[i]});
+    }
+
+    // Calcular para varios quantums
+    let quantums = [];
+    let resultadosQuantum = [];
+    for (let q = 1; q <= 10; q++) {
+        let {resultados} = roundRobin(processes, q);
+        let awt = resultados.reduce((acc, r) => acc + r.espera, 0) / resultados.length;
+        quantums.push(q);
+        resultadosQuantum.push({q, awt: Math.round(awt*100)/100});
+    }
+    // Elegir el quantum más pequeño en caso de empate en el mínimo AWT
+    let opt = resultadosQuantum.reduce((a, b) => {
+        if (a.awt < b.awt) return a;
+        if (a.awt > b.awt) return b;
+        return a.q < b.q ? a : b;
+    });
+    document.getElementById('quantumOptimo').textContent = `${opt.q} (AWT = ${opt.awt})`;
+
+    // Mostrar tabla comparativa
+    let tbodyComp = document.querySelector('#tablaComparativa tbody');
+    tbodyComp.innerHTML = '';
+    resultadosQuantum.forEach(r => {
+        let tr = document.createElement('tr');
+        if (r.q === opt.q) tr.className = 'table-success';
+        tr.innerHTML = `<td>${r.q}</td><td>${r.awt.toFixed(2)}</td>`;
+        tbodyComp.appendChild(tr);
+    });
+
+    // Calcular resultados para el quantum elegido
+    let {resultados, stateTimeline, ganttCSV} = roundRobin(processes, quantum);
+
+    // Mostrar tabla de resultados
+    let tbodyRes = document.querySelector('#tablaResultados tbody');
+    tbodyRes.innerHTML = '';
+    resultados.forEach(r => {
+        tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td></tr>`;
+    });
+    let act = resultados.reduce((acc, r) => acc + r.retorno, 0) / resultados.length;
+    let awt = resultados.reduce((acc, r) => acc + r.espera, 0) / resultados.length;
+    document.getElementById('act').textContent = act.toFixed(2);
+    document.getElementById('awt').textContent = awt.toFixed(2);
+
+    // Mostrar Gantt como tabla coloreada
+    mostrarGantt(stateTimeline, processes);
+
+    // Mostrar CSV como tabla
+    mostrarCSV(ganttCSV);
+
+    document.getElementById('resultados').style.display = '';
+}
+
+// Algoritmo Round Robin en JS
+function roundRobin(processes, quantum) {
+    let n = processes.length;
+    let procs = processes.map(p => ({
+        pid: p.pid,
+        arrival: p.arrival,
+        burst: p.burst,
+        remaining: p.burst,
+        finished: false,
+        firstExec: null
+    }));
+    let time = 0, completed = 0;
+    let ready = [];
+    let stateTimeline = [];
+    let finishTimes = {};
+    let waiting = procs.slice().sort((a, b) => a.arrival - b.arrival);
+
+    while (completed < n) {
+        // Añadir procesos que llegan
+        while (waiting.length && waiting[0].arrival <= time) {
+            ready.push(waiting.shift());
+        }
+        if (ready.length === 0) {
+            stateTimeline.push({});
+            time++;
+            continue;
+        }
+        let p = ready.shift();
+        if (p.firstExec === null) p.firstExec = time;
+        let exec = Math.min(quantum, p.remaining);
+        for (let i = 0; i < exec; i++) {
+            let state = {};
+            procs.forEach(proc => {
+                if (proc.pid === p.pid) state[proc.pid] = 'E';
+                else if (proc.arrival > time) state[proc.pid] = '';
+                else if (proc.remaining > 0) state[proc.pid] = 'L';
+                else state[proc.pid] = '';
+            });
+            stateTimeline.push(state);
+            p.remaining--;
+            time++;
+            // Añadir procesos que llegan durante ejecución
+            while (waiting.length && waiting[0].arrival <= time) {
+                ready.push(waiting.shift());
+            }
+            if (p.remaining === 0) break;
+        }
+        if (p.remaining === 0) {
+            p.finished = true;
+            finishTimes[p.pid] = time;
+            completed++;
+        } else {
+            ready.push(p);
+        }
+    }
+    // Marcar F en el timeline
+    Object.entries(finishTimes).forEach(([pid, ft]) => {
+        if (ft < stateTimeline.length) stateTimeline[ft][parseInt(pid)] = 'F';
+        else {
+            let state = {};
+            procs.forEach(proc => state[proc.pid] = '');
+            state[pid] = 'F';
+            stateTimeline.push(state);
+        }
+    });
+    // Calcular resultados
+    let resultados = procs.map(p => {
+        let tRetorno = finishTimes[p.pid] - p.arrival;
+        let tEspera = tRetorno - p.burst;
+        return {pid: p.pid, retorno: tRetorno, espera: tEspera};
+    });
+    // Generar CSV
+    let header = ['Process'];
+    for (let t = 0; t < stateTimeline.length; t++) header.push(t);
+    let ganttCSV = [header];
+    procs.forEach(p => {
+        let row = [`P${p.pid}`];
+        for (let t = 0; t < stateTimeline.length; t++) {
+            row.push(stateTimeline[t][p.pid] || '');
+        }
+        ganttCSV.push(row);
+    });
+    return {resultados, stateTimeline, ganttCSV};
+}
+
+function mostrarGantt(stateTimeline, processes) {
+    let div = document.getElementById('ganttChart');
+    let html = '<table class="table table-bordered gantt-table"><thead><tr><th>Proceso</th>';
+    for (let t = 0; t < stateTimeline.length; t++) html += `<th>${t}</th>`;
+    html += '</tr></thead><tbody>';
+    processes.forEach(p => {
+        html += `<tr><td>P${p.pid}</td>`;
+        for (let t = 0; t < stateTimeline.length; t++) {
+            let val = stateTimeline[t][p.pid] || '';
+            let cls = val ? 'gantt-' + val : 'gantt-empty';
+            html += `<td class="${cls}">${val}</td>`;
+        }
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    div.innerHTML = html;
+}
+
+function mostrarCSV(csv) {
+    // Generar CSV string para descarga
+    let csvString = csv.map(row => row.map(cell => '"'+cell+'"').join(",")).join("\n");
+    let downloadBtn = document.getElementById('downloadCSV');
+    downloadBtn.onclick = function() {
+        let blob = new Blob([csvString], {type: 'text/csv'});
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = 'gantt_chart.csv';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    };
+    // No mostrar el CSV como tabla visual
+    document.getElementById('csvTable').innerHTML = '';
+}
 </script>
 </body>
 </html>
