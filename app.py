@@ -117,8 +117,8 @@ def main():
         # Each column represents a process: [arrival_time, execution_time]
         process_matrix = [
             # P1   P2   P3   P4   P5
-            [0,    1,   2,   4,   5],    # Tiempos de llegada
-            [7,    3,   4,   2,   4]     # Tiempos de ejecución
+            [0, 1, 3, 4],    # Tiempos de llegada - Arrive Time
+            [3, 2, 5, 6]     # Tiempos de ejecución - Burst Time
         ]
         
         time_quantum = 3  # Quantum definido
@@ -144,6 +144,26 @@ def main():
             print(f"P{i+1} | {arrival_time:14} | {burst_time:16}")
         
         print(f"\nQuantum: {time_quantum}")
+        
+        # Lista de quantums a probar
+        quantums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        resultados_quantum = []
+
+        print("\nComparativa de Quantum y su AWT (Average Waiting Time):")
+        print("Quantum | AWT")
+        print("--------|------")
+        for q in quantums:
+            # Crear nuevos procesos para cada quantum
+            procesos_test = [Process(p.pid, p.priority, p.burst_time, p.arrival_time) for p in processes]
+            _, resultados_test = round_robin_scheduler(procesos_test, q)
+            suma_espera_test = sum(r['espera'] for r in resultados_test)
+            awt_test = suma_espera_test / len(resultados_test)
+            resultados_quantum.append((q, awt_test))
+            print(f"   {q:2d}    | {awt_test:.2f}")
+
+        # Encontrar el quantum óptimo (menor AWT)
+        quantum_optimo, awt_optimo = min(resultados_quantum, key=lambda x: x[1])
+        print(f"\nQuantum óptimo según AWT: {quantum_optimo} (AWT = {awt_optimo:.2f})\n")
         
         # El ordenamiento por tiempo de llegada se mantiene
         processes.sort(key=lambda p: p.arrival_time)
