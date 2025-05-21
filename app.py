@@ -1,5 +1,13 @@
 import csv
 from collections import deque
+from flask import Flask, render_template, request, redirect, url_for
+import os
+import matplotlib
+matplotlib.use('Agg')  # Usar backend no interactivo para evitar errores con Flask
+import matplotlib.pyplot as plt
+import numpy as np
+
+app = Flask(__name__)
 
 class Process:
     def __init__(self, pid, priority, burst_time, arrival_time=0):
@@ -111,103 +119,83 @@ def generate_gantt_csv(state_timeline, processes, filename="gantt_chart.csv"):
 
     return filename
 
-def main():
-    try:
-        # Define the matrix with process data
-        # Each column represents a process: [arrival_time, execution_time]
-        process_matrix = [
-            # P1   P2   P3   P4   P5
-            [0, 1, 3, 4],    # Tiempos de llegada - Arrive Time
-            [3, 2, 5, 6]     # Tiempos de ejecución - Burst Time
-        ]
-        
-        time_quantum = 3  # Quantum definido
-        
-        # Extraer datos de la matriz
-        num_processes = len(process_matrix[0])
-        processes = []
-        
-        print("\nProcesos registrados desde la matriz:")
-        print("PID | Tiempo Llegada | Tiempo Ejecución")
-        print("----|----------------|----------------")
-        
-        for i in range(num_processes):
-            arrival_time = process_matrix[0][i]
-            burst_time = process_matrix[1][i]
-            
-            if burst_time <= 0 or arrival_time < 0:
-                raise ValueError(f"Error en datos del proceso P{i+1}: El tiempo de ejecución debe ser mayor que cero y el tiempo de llegada debe ser mayor o igual a cero")
-                
-            # Usando un valor predeterminado para la prioridad ya que no se requiere
-            priority = 0
-            processes.append(Process(i+1, priority, burst_time, arrival_time))
-            print(f"P{i+1} | {arrival_time:14} | {burst_time:16}")
-        
-        print(f"\nQuantum: {time_quantum}")
-        
-        # Lista de quantums a probar
-        quantums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+# Utilidad para dibujar el Gantt como imagen
+def draw_gantt(state_timeline, processes, filename):
+    fig, ax = plt.subplots(figsize=(max(8, len(state_timeline)//2), 2+len(processes)*0.5))
+    yticks = []
+    ylabels = []
+    colors = {'E': '#4caf50', 'L': '#ffc107', 'F': '#2196f3', '': '#f5f5f5'}
+    for idx, p in enumerate(processes):
+        yticks.append(idx)
+        ylabels.append(f'P{p.pid}')
+        last = None
+        start = 0
+        for t, state in enumerate(state_timeline):
+            val = state[p.pid]
+            if val != last:
+                if last is not None and last != '':
+                    ax.barh(idx, t-start, left=start, color=colors[last], edgecolor='k', height=0.5)
+                start = t
+                last = val
+        if last and last != '':
+            ax.barh(idx, len(state_timeline)-start, left=start, color=colors[last], edgecolor='k', height=0.5)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels)
+    ax.set_xlabel('Tiempo')
+    ax.set_title('Diagrama de Gantt')
+    ax.grid(True, axis='x', linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+
+# Utilidad para leer el CSV generado
+def read_csv_table(filename):
+    with open(filename, newline='') as f:
+        return list(csv.reader(f))
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    results = None
+    if request.method == 'POST':
+        n = int(request.form['num_processes'])
+        quantum = int(request.form['quantum'])
+        arrivals = [int(request.form[f'arrival_{i}']) for i in range(n)]
+        bursts = [int(request.form[f'burst_{i}']) for i in range(n)]
+        processes = [Process(i+1, 0, bursts[i], arrivals[i]) for i in range(n)]
+        # Calcular para varios quantums
+        quantums = list(range(1, 11))
         resultados_quantum = []
-
-        print("\nComparativa de Quantum y su AWT (Average Waiting Time):")
-        print("Quantum | AWT")
-        print("--------|------")
         for q in quantums:
-            # Crear nuevos procesos para cada quantum
-            procesos_test = [Process(p.pid, p.priority, p.burst_time, p.arrival_time) for p in processes]
-            _, resultados_test = round_robin_scheduler(procesos_test, q)
-            suma_espera_test = sum(r['espera'] for r in resultados_test)
-            awt_test = suma_espera_test / len(resultados_test)
-            resultados_quantum.append((q, awt_test))
-            print(f"   {q:2d}    | {awt_test:.2f}")
-
-        # Encontrar el quantum óptimo (menor AWT)
+            test_procs = [Process(p.pid, p.priority, p.burst_time, p.arrival_time) for p in processes]
+            _, res = round_robin_scheduler(test_procs, q)
+            awt = sum(r['espera'] for r in res) / len(res)
+            resultados_quantum.append((q, round(awt,2)))
         quantum_optimo, awt_optimo = min(resultados_quantum, key=lambda x: x[1])
-        print(f"\nQuantum óptimo según AWT: {quantum_optimo} (AWT = {awt_optimo:.2f})\n")
-        
-        # El ordenamiento por tiempo de llegada se mantiene
+        # Calcular resultados para el quantum elegido
         processes.sort(key=lambda p: p.arrival_time)
-        state_timeline, resultados = round_robin_scheduler(processes, time_quantum)
-        output_file = generate_gantt_csv(state_timeline, processes)
-        
-        print(f"\nGantt chart generado como '{output_file}'")
-        print("E: Ejecutando | L: Esperando | F: Finalizado")
+        state_timeline, resultados = round_robin_scheduler(processes, quantum)
+        act = round(sum(r['retorno'] for r in resultados)/len(resultados),2)
+        awt = round(sum(r['espera'] for r in resultados)/len(resultados),2)
+        # Guardar Gantt como imagen
+        static_path = os.path.join(app.root_path, 'static')
+        if not os.path.exists(static_path):
+            os.makedirs(static_path)
+        gantt_img = os.path.join(static_path, 'gantt.png')
+        draw_gantt(state_timeline, processes, gantt_img)
+        # Leer CSV para mostrarlo como tabla
+        csv_file = os.path.join(app.root_path, 'gantt_chart.csv')
+        generate_gantt_csv(state_timeline, processes, csv_file)
+        csv_data = read_csv_table(csv_file)
+        results = {
+            'quantum_optimo': quantum_optimo,
+            'awt_optimo': awt_optimo,
+            'resultados_quantum': resultados_quantum,
+            'resultados': resultados,
+            'act': act,
+            'awt': awt,
+            'csv_data': csv_data
+        }
+    return render_template('index.html', results=results)
 
-        # Mostrar tiempos de completitud y espera
-        print("\nPID | CT (Tiempo de Completitud / Complete Time) | WT (Tiempo de Espera / Waiting Time)")
-        print("----|------------------------------------------|-------------------------------")
-        suma_retorno = 0
-        suma_espera = 0
-        for r in resultados:
-            print(f"P{r['pid']}  | {r['retorno']!r}                                   | {r['espera']!r}")
-            suma_retorno += r['retorno']
-            suma_espera += r['espera']
-        n = len(resultados)
-        awt = suma_espera / n
-        act = suma_retorno / n
-        print(f"\nT. medio de CT (ACT): {act:.2f} (Promedio de Completitud / Average Completion Time)")
-        print(f"T. medio de WT (AWT): {awt:.2f} (Promedio de Espera / Average Waiting Time)")
-
-        # Calcular y mostrar el WT en FCFS (no óptimo global, solo secuencial)
-        n_fcfs = len(processes)  # Claridad: n es el número de procesos
-        procesos_ordenados = sorted(processes, key=lambda p: (p.arrival_time, p.pid))  # Desempate por PID
-        wt_fcfs = []
-        tiempo_actual = 0
-        for i, p in enumerate(procesos_ordenados):
-            if tiempo_actual < p.arrival_time:
-                tiempo_actual = p.arrival_time
-            if i == 0:
-                wt_fcfs.append(0)
-            else:
-                wt_fcfs.append(tiempo_actual - p.arrival_time)
-            tiempo_actual += p.burst_time  # burst_time es inmutable
-        awt_fcfs = sum(wt_fcfs) / n_fcfs
-        print(f"\nWT en FCFS: {awt_fcfs:.2f} (Tiempo de Espera en FCFS / Waiting Time in FCFS)")
-    
-    except ValueError as e:
-        print(f"Error: {e}")
-    except Exception as e:
-        print(f"Error inesperado: {e}")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    app.run(debug=True)
