@@ -153,18 +153,36 @@ def main():
         print(f"\nGantt chart generado como '{output_file}'")
         print("E: Ejecutando | L: Esperando | F: Finalizado")
 
-        # Mostrar tiempos de retorno y espera
-        print("\nPID | T. Retorno | T. Espera")
-        print("----|------------|-----------")
+        # Mostrar tiempos de completitud y espera
+        print("\nPID | CT (Tiempo de Completitud / Complete Time) | WT (Tiempo de Espera / Waiting Time)")
+        print("----|------------------------------------------|-------------------------------")
         suma_retorno = 0
         suma_espera = 0
         for r in resultados:
-            print(f"P{r['pid']}  | {r['retorno']!r} | {r['espera']!r}")
+            print(f"P{r['pid']}  | {r['retorno']!r}                                   | {r['espera']!r}")
             suma_retorno += r['retorno']
             suma_espera += r['espera']
         n = len(resultados)
-        print(f"\nT. medio de Retorno: {suma_retorno/n!r}")
-        print(f"T. medio de Espera: {suma_espera/n!r}")
+        awt = suma_espera / n
+        act = suma_retorno / n
+        print(f"\nT. medio de CT (ACT): {act:.2f} (Promedio de Completitud / Average Completion Time)")
+        print(f"T. medio de WT (AWT): {awt:.2f} (Promedio de Espera / Average Waiting Time)")
+
+        # Calcular y mostrar el WT en FCFS (no óptimo global, solo secuencial)
+        n_fcfs = len(processes)  # Claridad: n es el número de procesos
+        procesos_ordenados = sorted(processes, key=lambda p: (p.arrival_time, p.pid))  # Desempate por PID
+        wt_fcfs = []
+        tiempo_actual = 0
+        for i, p in enumerate(procesos_ordenados):
+            if tiempo_actual < p.arrival_time:
+                tiempo_actual = p.arrival_time
+            if i == 0:
+                wt_fcfs.append(0)
+            else:
+                wt_fcfs.append(tiempo_actual - p.arrival_time)
+            tiempo_actual += p.burst_time  # burst_time es inmutable
+        awt_fcfs = sum(wt_fcfs) / n_fcfs
+        print(f"\nWT en FCFS: {awt_fcfs:.2f} (Tiempo de Espera en FCFS / Waiting Time in FCFS)")
     
     except ValueError as e:
         print(f"Error: {e}")
