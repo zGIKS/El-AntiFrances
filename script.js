@@ -134,9 +134,10 @@ const RoundRobinApp = (function() {
         let resultadosQuantum = [];
         for (let q = 1; q <= 10; q++) {
             let scheduler = new RoundRobinScheduler(processes, q);
-            let {resultados} = scheduler.ejecutar();
+            let {resultados, stateTimeline} = scheduler.ejecutar();
             let awt = resultados.reduce((acc, r) => acc + r.espera, 0) / resultados.length;
-            resultadosQuantum.push({q, awt: Math.round(awt*100)/100});
+            let act = resultados.reduce((acc, r) => acc + r.retorno, 0) / resultados.length;
+            resultadosQuantum.push({q, awt: Math.round(awt*100)/100, act: Math.round(act*100)/100});
         }
         // Elegir el quantum más pequeño en caso de empate en el mínimo AWT
         let opt = resultadosQuantum.reduce((a, b) => {
@@ -151,7 +152,7 @@ const RoundRobinApp = (function() {
         resultadosQuantum.forEach(r => {
             let tr = document.createElement('tr');
             if (r.q === opt.q) tr.className = 'table-success';
-            tr.innerHTML = `<td>${r.q}</td><td>${r.awt.toFixed(2)}</td>`;
+            tr.innerHTML = `<td>${r.q}</td><td>${r.awt.toFixed(2)}</td><td>${r.act.toFixed(2)}</td>`;
             tbodyComp.appendChild(tr);
         });
         // Calcular resultados para el quantum elegido
@@ -161,7 +162,8 @@ const RoundRobinApp = (function() {
         let tbodyRes = document.querySelector('#tablaResultados tbody');
         tbodyRes.innerHTML = '';
         resultados.forEach(r => {
-            tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td>`;
+            let fi = r.retorno + arrivals[r.pid-1];
+            tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td><td>${fi}</td>`;
         });
         let act = resultados.reduce((acc, r) => acc + r.retorno, 0) / resultados.length;
         let awt = resultados.reduce((acc, r) => acc + r.espera, 0) / resultados.length;
@@ -204,12 +206,15 @@ const RoundRobinApp = (function() {
         entrada.push(['Quantum óptimo:', opt.q, 'AWT óptimo:', opt.awt]);
         entrada.push(['']);
         entrada.push(['Comparativa Quantum/AWT:']);
-        entrada.push(['Quantum', 'AWT']);
-        resultadosQuantum.forEach(r => entrada.push([r.q, r.awt]));
+        entrada.push(['Quantum', 'AWT', 'ACT']);
+        resultadosQuantum.forEach(r => entrada.push([r.q, r.awt, r.act]));
         entrada.push(['']);
         entrada.push(['Tabla de resultados:']);
-        entrada.push(['PID', 'CT', 'WT']);
-        resultados.forEach(r => entrada.push([`P${r.pid}`, r.retorno, r.espera]));
+        entrada.push(['PID', 'CT', 'WT', 'FI']);
+        resultados.forEach(r => {
+            let fi = r.retorno + arrivals[r.pid-1];
+            entrada.push([`P${r.pid}`, r.retorno, r.espera, fi]);
+        });
         entrada.push(['']);
         entrada.push(['T. medio de CT (ACT):', act]);
         entrada.push(['T. medio de WT (AWT):', awt]);
