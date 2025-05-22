@@ -11,12 +11,21 @@
     <h1 class="mb-4">Calculadora Round Robin (JS)</h1>
     <form id="processForm" autocomplete="off" onsubmit="event.preventDefault(); RoundRobinApp.calcular();">
         <div class="mb-3">
+            <label for="schedulerType" class="form-label">Tipo de planificación:</label>
+            <select id="schedulerType" class="form-select" style="width:220px;display:inline-block;">
+                <option value="rr">Round Robin</option>
+                <option value="fcfs">FCFS</option>
+            </select>
+        </div>
+        <div class="mb-3">
             <label for="num_processes" class="form-label">Número de procesos:</label>
             <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;">
+        </div>
+        <div class="mb-3" id="quantumGroup">
             <label for="quantum" class="form-label ms-3">Quantum:</label>
             <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;">
-            <button type="button" class="btn btn-secondary ms-3" onclick="RoundRobinApp.updateTable()">Actualizar tabla</button>
         </div>
+        <button type="button" class="btn btn-secondary ms-3" onclick="updateTable()">Actualizar tabla</button>
         <div class="excel-table">
             <table class="table table-bordered align-middle" id="processTable">
                 <thead class="table-light">
@@ -70,5 +79,78 @@
     </div>
 </div>
 <script src="script.js"></script>
+<script src="fcfs.js"></script>
+<script>
+const schedulerTypeSelect = document.getElementById('schedulerType');
+const processForm = document.getElementById('processForm');
+const quantumGroup = document.getElementById('quantumGroup');
+const quantumInput = document.getElementById('quantum');
+const tablaComparativa = document.getElementById('tablaComparativa');
+const quantumOptimo = document.getElementById('quantumOptimo');
+
+function setAppByType() {
+    const type = schedulerTypeSelect.value;
+    if (type === 'fcfs') {
+        processForm.onsubmit = function(e) { e.preventDefault(); FCFSApp.calcular(); };
+        window.updateTable = FCFSApp.updateTable;
+        window.calcular = FCFSApp.calcular;
+        FCFSApp.updateTable();
+        quantumGroup.style.display = 'none';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else {
+        processForm.onsubmit = function(e) { e.preventDefault(); RoundRobinApp.calcular(); };
+        window.updateTable = RoundRobinApp.updateTable;
+        window.calcular = RoundRobinApp.calcular;
+        RoundRobinApp.updateTable();
+        quantumGroup.style.display = '';
+        if (tablaComparativa) tablaComparativa.style.display = '';
+    }
+}
+
+// Validación de entradas para ambos métodos
+function validarEntradas() {
+    const n = parseInt(document.getElementById('num_processes').value);
+    if (isNaN(n) || n < 1 || n > 10) {
+        alert('El número de procesos debe estar entre 1 y 10.');
+        return false;
+    }
+    for (let i = 0; i < n; i++) {
+        const llegada = document.getElementsByName('arrival_' + i)[0].value;
+        const burst = document.getElementsByName('burst_' + i)[0].value;
+        if (llegada === '' || isNaN(llegada) || llegada < 0) {
+            alert('El tiempo de llegada debe ser un número mayor o igual a 0.');
+            return false;
+        }
+        if (burst === '' || isNaN(burst) || burst < 1) {
+            alert('El tiempo de ejecución debe ser un número mayor o igual a 1.');
+            return false;
+        }
+    }
+    if (schedulerTypeSelect.value === 'rr') {
+        const quantum = quantumInput.value;
+        if (quantum === '' || isNaN(quantum) || quantum < 1) {
+            alert('El quantum debe ser un número mayor o igual a 1.');
+            return false;
+        }
+    }
+    return true;
+}
+
+// Interceptar el botón Calcular para validar antes de ejecutar
+const calcularBtn = document.querySelector('button[type="submit"]');
+if (calcularBtn) {
+    calcularBtn.addEventListener('click', function(e) {
+        if (!validarEntradas()) {
+            e.preventDefault();
+            return false;
+        }
+        // El submit real lo hace el onsubmit del form
+    });
+}
+
+schedulerTypeSelect.addEventListener('change', setAppByType);
+document.addEventListener('DOMContentLoaded', setAppByType);
+</script>
 </body>
 </html>
