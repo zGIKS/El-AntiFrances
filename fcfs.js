@@ -81,7 +81,8 @@ class FCFSScheduler {
         let resultados = procs.map(p => {
             let tRetorno = finishTimes[p.pid] - p.arrival;
             let tEspera = tRetorno - p.burst;
-            return {pid: p.pid, retorno: tRetorno, espera: tEspera};
+            let tComienzo = p.firstExec !== null ? p.firstExec : (finishTimes[p.pid] - p.burst); // CO
+            return {pid: p.pid, retorno: tRetorno, espera: tEspera, comienzo: tComienzo};
         });
         // Generar CSV
         let header = ['Process'];
@@ -138,7 +139,7 @@ const FCFSApp = (function() {
         tbodyRes.innerHTML = '';
         resultados.forEach(r => {
             let fi = fiPorPid[r.pid] !== undefined ? (fiPorPid[r.pid] - 1) : (r.retorno + arrivals[r.pid-1]);
-            tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td><td>${fi}</td>`;
+            tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td><td>${r.comienzo}</td><td>${fi}</td>`;
         });
         let act = resultados.reduce((acc, r) => acc + r.retorno, 0) / resultados.length;
         let awt = resultados.reduce((acc, r) => acc + r.espera, 0) / resultados.length;
@@ -160,10 +161,10 @@ const FCFSApp = (function() {
         });
         entrada.push(['']);
         entrada.push(['Tabla de resultados:']);
-        entrada.push(['PID', 'CT', 'WT', 'FI']);
+        entrada.push(['PID', 'CT', 'WT', 'CO', 'FI']);
         resultados.forEach(r => {
             let fi = fiPorPid && fiPorPid[r.pid] !== undefined ? (fiPorPid[r.pid] - 1) : (r.retorno + arrivals[r.pid-1]);
-            entrada.push([`P${r.pid}`, r.retorno, r.espera, fi]);
+            entrada.push([`P${r.pid}`, r.retorno, r.espera, r.comienzo, fi]);
         });
         entrada.push(['']);
         entrada.push(['T. medio de CT (ACT):', act]);
