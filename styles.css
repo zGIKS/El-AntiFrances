@@ -1,0 +1,14 @@
+/* Estilos principales para la calculadora Round Robin */
+.excel-table input {
+    width: 80px;
+    text-align: center;
+}
+.gantt-table td, .gantt-table th {
+    text-align: center;
+    min-width: 24px;
+    padding: 2px 4px;
+}
+.gantt-E { background: #4caf50 !important; color: #fff !important; }
+.gantt-L { background: #ffc107 !important; color: #000 !important; }
+.gantt-F { background: #e53935 !important; color: #fff !important; }
+.gantt-empty { background: #f5f5f5; }

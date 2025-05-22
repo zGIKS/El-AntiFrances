@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Calculadora Round Robin (JS)</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-4">Calculadora Round Robin (JS)</h1>
+    <form id="processForm" autocomplete="off" onsubmit="event.preventDefault(); RoundRobinApp.calcular();">
+        <div class="mb-3">
+            <label for="num_processes" class="form-label">Número de procesos:</label>
+            <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;">
+            <label for="quantum" class="form-label ms-3">Quantum:</label>
+            <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;">
+            <button type="button" class="btn btn-secondary ms-3" onclick="RoundRobinApp.updateTable()">Actualizar tabla</button>
+        </div>
+        <div class="excel-table">
+            <table class="table table-bordered align-middle" id="processTable">
+                <thead class="table-light">
+                <tr>
+                    <th>PID</th>
+                    <th>Tiempo de llegada</th>
+                    <th>Tiempo de ejecución</th>
+                </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-primary">Calcular</button>
+    </form>
+
+    <div id="resultados" style="display:none;">
+        <hr>
+        <h3>Resultados</h3>
+        <div class="mb-3">
+            <strong>Quantum óptimo:</strong> <span id="quantumOptimo"></span>
+        </div>
+        <div>
+            <strong>Comparativa de Quantum y su AWT:</strong>
+            <table class="table table-sm table-striped w-auto" id="tablaComparativa">
+                <thead><tr><th>Quantum</th><th>AWT</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div>
+            <strong>Tabla de resultados:</strong>
+            <table class="table table-bordered w-auto" id="tablaResultados">
+                <thead><tr><th>PID</th><th>CT</th><th>WT</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div>
+                <strong>T. medio de CT (ACT):</strong> <span id="act"></span><br>
+                <strong>T. medio de WT (AWT):</strong> <span id="awt"></span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <strong>Gantt Chart:</strong><br>
+            <div id="ganttChart"></div>
+        </div>
+        <div class="csv-table mt-4">
+            <strong>CSV (Gantt como tabla):</strong>
+            <button id="downloadCSV" class="btn btn-success btn-sm mb-2">Descargar CSV</button>
+            <div id="csvTable"></div>
+            <strong>EXCEL (Gantt como tabla):</strong>
+            <button id="downloadExcel" class="btn btn-primary btn-sm mb-2">Descargar Excel</button>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
