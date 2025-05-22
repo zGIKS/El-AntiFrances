@@ -15,6 +15,7 @@
             <select id="schedulerType" class="form-select" style="width:220px;display:inline-block;">
                 <option value="rr">Round Robin</option>
                 <option value="fcfs">FCFS</option>
+                <option value="sjf">SJF</option>
             </select>
         </div>
         <div class="mb-3">
@@ -57,7 +58,7 @@
         <div>
             <strong>Tabla de resultados:</strong>
             <table class="table table-bordered w-auto" id="tablaResultados">
-                <thead><tr><th>PID</th><th>CT</th><th>WT</th><th>FI</th></tr></thead>
+                <thead><tr><th>PID</th><th>CT</th><th>WT</th><th>CO</th><th>FI</th></tr></thead>
                 <tbody></tbody>
             </table>
             <div>
@@ -80,6 +81,7 @@
 </div>
 <script src="script.js"></script>
 <script src="fcfs.js"></script>
+<script src="SJF.js"></script>
 <script>
 const schedulerTypeSelect = document.getElementById('schedulerType');
 const processForm = document.getElementById('processForm');
@@ -95,6 +97,14 @@ function setAppByType() {
         window.updateTable = FCFSApp.updateTable;
         window.calcular = FCFSApp.calcular;
         FCFSApp.updateTable();
+        quantumGroup.style.display = 'none';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else if (type === 'sjf') {
+        processForm.onsubmit = function(e) { e.preventDefault(); SJFApp.calcular(); };
+        window.updateTable = SJFApp.updateTable;
+        window.calcular = SJFApp.calcular;
+        SJFApp.updateTable();
         quantumGroup.style.display = 'none';
         if (tablaComparativa) tablaComparativa.style.display = 'none';
         if (quantumOptimo) quantumOptimo.textContent = '';

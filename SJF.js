@@ -1,5 +1,6 @@
-// fcfs.js - Lógica principal de la calculadora FCFS
-// Inspirado en la estructura de script.js (Round Robin)
+// filepath: /home/giks/Documentos/El-AntiFrances/SJF.js
+// SJF.js - Lógica principal de la calculadora SJF (no expropiativo)
+// Inspirado en la estructura de fcfs.js y script.js
 
 // Si Proceso ya está definido, no lo redefinir
 if (typeof Proceso === 'undefined') {
@@ -20,7 +21,7 @@ class Proceso {
 }
 }
 
-class FCFSScheduler {
+class SJFScheduler {
     constructor(processes) {
         // Clonar procesos para evitar efectos colaterales
         this.processes = processes.map(p => new Proceso(p.pid, p.arrival, p.burst));
@@ -46,6 +47,8 @@ class FCFSScheduler {
                 time++;
                 continue;
             }
+            // Elegir el proceso con menor burst (SJF no expropiativo)
+            ready.sort((a, b) => a.burst - b.burst || a.arrival - b.arrival);
             let p = ready.shift();
             if (p.firstExec === null) p.firstExec = time;
             for (let i = 0; i < p.burst; i++) {
@@ -100,7 +103,7 @@ class FCFSScheduler {
 }
 
 // Módulo principal (IIFE para evitar contaminación global)
-const FCFSApp = (function() {
+const SJFApp = (function() {
     function updateTable() {
         let n = parseInt(document.getElementById('num_processes').value);
         let tbody = document.getElementById('tableBody');
@@ -122,7 +125,7 @@ const FCFSApp = (function() {
         for (let i = 0; i < n; i++) {
             processes.push(new Proceso(i+1, arrivals[i], bursts[i]));
         }
-        let scheduler = new FCFSScheduler(processes);
+        let scheduler = new SJFScheduler(processes);
         let {resultados, stateTimeline, ganttCSV} = scheduler.ejecutar();
         // Calcular FI real por la celda 'F'
         let fiPorPid = {};
@@ -152,6 +155,24 @@ const FCFSApp = (function() {
         document.getElementById('resultados').style.display = '';
     }
 
+    function mostrarGantt(stateTimeline, processes) {
+        let div = document.getElementById('ganttChart');
+        let html = '<table class="table table-bordered gantt-table"><thead><tr><th>Proceso</th>';
+        for (let t = 0; t < stateTimeline.length; t++) html += `<th>${t}</th>`;
+        html += '</tr></thead><tbody>';
+        processes.forEach(p => {
+            html += `<tr><td>P${p.pid}</td>`;
+            for (let t = 0; t < stateTimeline.length; t++) {
+                let val = stateTimeline[t][p.pid] || '';
+                let cls = val ? 'gantt-' + val : 'gantt-empty';
+                html += `<td class="${cls}">${val}</td>`;
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        div.innerHTML = html;
+    }
+
     function mostrarCSV(csv, processes, resultados, act, awt, arrivals, bursts, fiPorPid) {
         // Construir cabecera de datos para CSV/Excel
         let entrada = [['Datos de entrada:']];
@@ -179,7 +200,7 @@ const FCFSApp = (function() {
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = 'gantt_chart_fcfs.csv';
+            a.download = 'gantt_chart_sjf.csv';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
@@ -217,7 +238,7 @@ const FCFSApp = (function() {
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = 'gantt_chart_fcfs.xls';
+            a.download = 'gantt_chart_sjf.xls';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
@@ -232,6 +253,6 @@ const FCFSApp = (function() {
     };
 })();
 
-document.addEventListener('DOMContentLoaded', FCFSApp.updateTable);
-window.updateTable = FCFSApp.updateTable;
-window.calcular = FCFSApp.calcular;
+document.addEventListener('DOMContentLoaded', SJFApp.updateTable);
+window.updateTable = SJFApp.updateTable;
+window.calcular = SJFApp.calcular;
