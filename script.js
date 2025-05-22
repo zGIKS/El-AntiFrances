@@ -158,11 +158,21 @@ const RoundRobinApp = (function() {
         // Calcular resultados para el quantum elegido
         let scheduler = new RoundRobinScheduler(processes, quantum);
         let {resultados, stateTimeline, ganttCSV} = scheduler.ejecutar();
+        // Calcular FI real por la celda 'F'
+        let fiPorPid = {};
+        processes.forEach(p => {
+            for (let t = 0; t < stateTimeline.length; t++) {
+                if (stateTimeline[t][p.pid] === 'F') {
+                    fiPorPid[p.pid] = t;
+                    break;
+                }
+            }
+        });
         // Mostrar tabla de resultados
         let tbodyRes = document.querySelector('#tablaResultados tbody');
         tbodyRes.innerHTML = '';
         resultados.forEach(r => {
-            let fi = r.retorno + arrivals[r.pid-1];
+            let fi = fiPorPid[r.pid] !== undefined ? (fiPorPid[r.pid] - 1) : (r.retorno + arrivals[r.pid-1]);
             tbodyRes.innerHTML += `<tr><td>P${r.pid}</td><td>${r.retorno}</td><td>${r.espera}</td><td>${fi}</td>`;
         });
         let act = resultados.reduce((acc, r) => acc + r.retorno, 0) / resultados.length;
@@ -172,7 +182,7 @@ const RoundRobinApp = (function() {
         // Mostrar Gantt como tabla coloreada
         mostrarGantt(stateTimeline, processes);
         // Mostrar CSV como tabla
-        mostrarCSV(ganttCSV, processes, quantum, resultadosQuantum, opt, resultados, act, awt, arrivals, bursts);
+        mostrarCSV(ganttCSV, processes, quantum, resultadosQuantum, opt, resultados, act, awt, arrivals, bursts, fiPorPid);
         document.getElementById('resultados').style.display = '';
     }
 
@@ -194,7 +204,7 @@ const RoundRobinApp = (function() {
         div.innerHTML = html;
     }
 
-    function mostrarCSV(csv, processes, quantum, resultadosQuantum, opt, resultados, act, awt, arrivals, bursts) {
+    function mostrarCSV(csv, processes, quantum, resultadosQuantum, opt, resultados, act, awt, arrivals, bursts, fiPorPid) {
         // Construir cabecera de datos para CSV/Excel
         let entrada = [['Datos de entrada:']];
         entrada.push(['PID', 'Llegada', 'Ejecución']);
@@ -212,7 +222,7 @@ const RoundRobinApp = (function() {
         entrada.push(['Tabla de resultados:']);
         entrada.push(['PID', 'CT', 'WT', 'FI']);
         resultados.forEach(r => {
-            let fi = r.retorno + arrivals[r.pid-1];
+            let fi = fiPorPid && fiPorPid[r.pid] !== undefined ? (fiPorPid[r.pid] - 1) : (r.retorno + arrivals[r.pid-1]);
             entrada.push([`P${r.pid}`, r.retorno, r.espera, fi]);
         });
         entrada.push(['']);
