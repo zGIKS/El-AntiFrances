@@ -132,18 +132,24 @@ const ColasApp = (function() {
         let n = parseInt(document.getElementById('num_processes').value);
         let tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
+        // Detectar si estamos en modo 'colas'
+        let isColas = document.getElementById('schedulerType').value === 'colas';
         for (let i = 0; i < n; i++) {
             let row = `<tr>
                 <td>P${i+1}</td>
                 <td><input type="number" name="arrival_${i}" value="${i}" min="0" required></td>
-                <td><input type="number" name="burst_${i}" value="3" min="1" required></td>
-                <td><input type="number" name="priority_${i}" value="1" min="1" max="10" required></td>
-            </tr>`;
+                <td><input type="number" name="burst_${i}" value="3" min="1" required></td>`;
+            if (isColas) {
+                row += `\n<td><input type="number" name="priority_${i}" value="1" min="1" max="10" required></td>`;
+            }
+            row += '\n</tr>';
             tbody.innerHTML += row;
         }
-        // Agregar cabecera de prioridad si no existe
+        // Cabecera de prioridad solo si es colas
         let thead = document.querySelector('#processTable thead tr');
-        if (thead && thead.children.length < 4) {
+        // Eliminar columna de prioridad si existe
+        while (thead.children.length > 3) thead.removeChild(thead.lastElementChild);
+        if (isColas && thead.children.length < 4) {
             let th = document.createElement('th');
             th.textContent = 'Prioridad';
             thead.appendChild(th);
