@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Calculadora Round Robin (JS)</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="styles.css">
@@ -16,15 +17,16 @@
                 <option value="rr">Round Robin</option>
                 <option value="fcfs">FCFS</option>
                 <option value="sjf">SJF</option>
+                <option value="colas">Colas de prioridad</option>
             </select>
         </div>
         <div class="mb-3">
             <label for="num_processes" class="form-label">Número de procesos:</label>
-            <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;">
+            <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;" title="Número de procesos" placeholder="Nº procesos">
         </div>
         <div class="mb-3" id="quantumGroup">
             <label for="quantum" class="form-label ms-3">Quantum:</label>
-            <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;">
+            <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;" title="Quantum" placeholder="Quantum">
         </div>
         <button type="button" class="btn btn-secondary ms-3" onclick="updateTable()">Actualizar tabla</button>
         <div class="excel-table">
@@ -34,6 +36,7 @@
                     <th>PID</th>
                     <th>Tiempo de llegada</th>
                     <th>Tiempo de ejecución</th>
+                    <!-- La columna de prioridad se agrega dinámicamente en ColasApp si corresponde -->
                 </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
@@ -79,6 +82,7 @@
         </div>
     </div>
 </div>
+<script src="colas.js"></script>
 <script src="script.js"></script>
 <script src="fcfs.js"></script>
 <script src="SJF.js"></script>
@@ -106,6 +110,14 @@ function setAppByType() {
         window.calcular = SJFApp.calcular;
         SJFApp.updateTable();
         quantumGroup.style.display = 'none';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else if (type === 'colas') {
+        processForm.onsubmit = function(e) { e.preventDefault(); ColasApp.calcular(); };
+        window.updateTable = ColasApp.updateTable;
+        window.calcular = ColasApp.calcular;
+        ColasApp.updateTable();
+        quantumGroup.style.display = '';
         if (tablaComparativa) tablaComparativa.style.display = 'none';
         if (quantumOptimo) quantumOptimo.textContent = '';
     } else {
@@ -159,8 +171,23 @@ if (calcularBtn) {
     });
 }
 
-schedulerTypeSelect.addEventListener('change', setAppByType);
-document.addEventListener('DOMContentLoaded', setAppByType);
+// Asegurar que la tabla de procesos se actualice al cambiar el número de procesos
+const numProcInput = document.getElementById('num_processes');
+if (numProcInput) {
+    numProcInput.addEventListener('change', function() {
+        if (typeof window.updateTable === 'function') window.updateTable();
+    });
+}
+
+// Asegurar que la tabla de procesos se actualice al cambiar el tipo de planificación
+schedulerTypeSelect.addEventListener('change', function() {
+    setAppByType();
+    if (typeof window.updateTable === 'function') window.updateTable();
+});
+document.addEventListener('DOMContentLoaded', function() {
+    setAppByType();
+    if (typeof window.updateTable === 'function') window.updateTable();
+});
 </script>
 </body>
 </html>
