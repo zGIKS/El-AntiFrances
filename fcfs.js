@@ -152,6 +152,24 @@ const FCFSApp = (function() {
         document.getElementById('resultados').style.display = '';
     }
 
+    function mostrarGantt(stateTimeline, processes) {
+        let div = document.getElementById('ganttChart');
+        let html = '<table class="table table-bordered gantt-table"><thead><tr><th>Proceso</th>';
+        for (let t = 0; t < stateTimeline.length; t++) html += `<th>${t}</th>`;
+        html += '</tr></thead><tbody>';
+        processes.forEach(p => {
+            html += `<tr><td>P${p.pid}</td>`;
+            for (let t = 0; t < stateTimeline.length; t++) {
+                let val = stateTimeline[t][p.pid] || '';
+                let cls = val ? 'gantt-' + val : 'gantt-empty';
+                html += `<td class="${cls}">${val}</td>`;
+            }
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        div.innerHTML = html;
+    }
+
     function mostrarCSV(csv, processes, resultados, act, awt, arrivals, bursts, fiPorPid) {
         // Construir cabecera de datos para CSV/Excel
         let entrada = [['Datos de entrada:']];
