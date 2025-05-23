@@ -28,7 +28,7 @@
             <label for="quantum" class="form-label ms-3">Quantum:</label>
             <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;" title="Quantum" placeholder="Quantum">
         </div>
-        <button type="button" class="btn btn-secondary ms-3" onclick="updateTable()">Actualizar tabla</button>
+        <button type="submit" class="btn btn-primary">Calcular</button>
         <div class="excel-table">
             <table class="table table-bordered align-middle" id="processTable">
                 <thead class="table-light">
@@ -42,7 +42,6 @@
                 <tbody id="tableBody"></tbody>
             </table>
         </div>
-        <button type="submit" class="btn btn-primary">Calcular</button>
     </form>
 
     <div id="resultados" style="display:none;">
