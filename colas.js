@@ -1,13 +1,11 @@
-// fcfs.js - Lógica principal de la calculadora FCFS
-// Inspirado en la estructura de script.js (Round Robin)
+// colas.js - Planificador de Colas de Prioridad con Round Robin interno
 
-// Si Proceso ya está definido, no lo redefinir
-if (typeof Proceso === 'undefined') {
-class Proceso {
-    constructor(pid, arrival, burst) {
+class ProcesoCola {
+    constructor(pid, arrival, burst, priority) {
         this.pid = pid;
         this.arrival = arrival;
         this.burst = burst;
+        this.priority = priority;
         this.remaining = burst;
         this.finished = false;
         this.firstExec = null;
@@ -18,12 +16,12 @@ class Proceso {
         this.firstExec = null;
     }
 }
-}
 
-class FCFSScheduler {
-    constructor(processes) {
+class ColasScheduler {
+    constructor(processes, quantum) {
         // Clonar procesos para evitar efectos colaterales
-        this.processes = processes.map(p => new Proceso(p.pid, p.arrival, p.burst));
+        this.processes = processes.map(p => new ProcesoCola(p.pid, p.arrival, p.burst, p.priority));
+        this.quantum = quantum;
         this.stateTimeline = [];
         this.finishTimes = {};
     }
@@ -32,40 +30,69 @@ class FCFSScheduler {
         let n = this.processes.length;
         let procs = this.processes.map(p => Object.assign(Object.create(Object.getPrototypeOf(p)), p));
         let time = 0, completed = 0;
-        let ready = [];
+        let ready = {}; // prioridad -> cola (array)
+        let waiting = procs.slice().sort((a, b) => a.arrival - b.arrival);
         let stateTimeline = [];
         let finishTimes = {};
-        let waiting = procs.slice().sort((a, b) => a.arrival - b.arrival);
+        let current = null;
+        let sliceCount = 0;
+        let priorities = [...new Set(procs.map(p => p.priority))].sort((a, b) => b - a); // mayor primero
 
-        while (completed < n) {
-            while (waiting.length && waiting[0].arrival <= time) {
-                ready.push(waiting.shift());
-            }
-            if (ready.length === 0) {
-                stateTimeline.push({});
-                time++;
-                continue;
-            }
-            let p = ready.shift();
-            if (p.firstExec === null) p.firstExec = time;
-            for (let i = 0; i < p.burst; i++) {
-                let state = {};
-                procs.forEach(proc => {
-                    if (proc.pid === p.pid) state[proc.pid] = 'E';
-                    else if (proc.arrival > time) state[proc.pid] = '';
-                    else if (proc.remaining > 0) state[proc.pid] = 'L';
-                    else state[proc.pid] = '';
-                });
-                stateTimeline.push(state);
-                p.remaining--;
-                time++;
-                while (waiting.length && waiting[0].arrival <= time) {
-                    ready.push(waiting.shift());
+        function enqueue(p) {
+            if (!ready[p.priority]) ready[p.priority] = [];
+            ready[p.priority].push(p);
+        }
+        function dequeue() {
+            for (let prio of priorities) {
+                if (ready[prio] && ready[prio].length > 0) {
+                    return ready[prio].shift();
                 }
             }
-            p.finished = true;
-            finishTimes[p.pid] = time;
-            completed++;
+            return null;
+        }
+
+        while (completed < n) {
+            // Llegadas
+            while (waiting.length && waiting[0].arrival <= time) {
+                let p = waiting.shift();
+                enqueue(p);
+                // Preempción estricta
+                if (current && p.priority > current.priority) {
+                    enqueue(current);
+                    current = null;
+                    sliceCount = 0;
+                }
+            }
+            // Seleccionar proceso actual si está vacío
+            if (!current) {
+                current = dequeue();
+                if (current && current.firstExec === null) current.firstExec = time;
+                sliceCount = 0;
+            }
+            // Timeline
+            let state = {};
+            procs.forEach(proc => {
+                if (current && proc.pid === current.pid) state[proc.pid] = 'E';
+                else if (proc.remaining > 0 && proc.arrival <= time) state[proc.pid] = 'L';
+                else state[proc.pid] = '';
+            });
+            stateTimeline.push(state);
+            // Ejecutar un tick
+            if (current) {
+                current.remaining--;
+                sliceCount++;
+                // Completado
+                if (current.remaining === 0) {
+                    finishTimes[current.pid] = time + 1;
+                    current.finished = true;
+                    completed++;
+                    current = null;
+                } else if (sliceCount === this.quantum) {
+                    enqueue(current);
+                    current = null;
+                }
+            }
+            time++;
         }
         // Marcar F en el timeline
         Object.entries(finishTimes).forEach(([pid, ft]) => {
@@ -81,8 +108,8 @@ class FCFSScheduler {
         let resultados = procs.map(p => {
             let tRetorno = finishTimes[p.pid] - p.arrival;
             let tEspera = tRetorno - p.burst;
-            let tComienzo = p.firstExec !== null ? p.firstExec : (finishTimes[p.pid] - p.burst); // CO
-            return {pid: p.pid, retorno: tRetorno, espera: tEspera, comienzo: tComienzo};
+            let tComienzo = p.firstExec !== null ? p.firstExec : (finishTimes[p.pid] - p.burst);
+            return {pid: p.pid, retorno: tRetorno, espera: tEspera, comienzo: tComienzo, prioridad: p.priority};
         });
         // Generar CSV
         let header = ['Process'];
@@ -99,30 +126,47 @@ class FCFSScheduler {
     }
 }
 
-// Módulo principal (IIFE para evitar contaminación global)
-const FCFSApp = (function() {
+// Módulo principal para la app de Colas
+const ColasApp = (function() {
     function updateTable() {
         let n = parseInt(document.getElementById('num_processes').value);
         let tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
         for (let i = 0; i < n; i++) {
-            let row = `<tr>\n                <td>P${i+1}</td>\n                <td><input type="number" name="arrival_${i}" value="${i}" min="0" required></td>\n                <td><input type="number" name="burst_${i}" value="3" min="1" required></td>\n            </tr>`;
+            let row = `<tr>
+                <td>P${i+1}</td>
+                <td><input type="number" name="arrival_${i}" value="${i}" min="0" required></td>
+                <td><input type="number" name="burst_${i}" value="3" min="1" required></td>
+                <td><input type="number" name="priority_${i}" value="1" min="1" max="10" required></td>
+            </tr>`;
             tbody.innerHTML += row;
+        }
+        // Agregar cabecera de prioridad si no existe
+        let thead = document.querySelector('#processTable thead tr');
+        if (thead && thead.children.length < 4) {
+            let th = document.createElement('th');
+            th.textContent = 'Prioridad';
+            thead.appendChild(th);
         }
     }
 
     function calcular() {
         let n = parseInt(document.getElementById('num_processes').value);
-        let arrivals = [], bursts = [];
+        let arrivals = [], bursts = [], priorities = [];
         for (let i = 0; i < n; i++) {
             arrivals.push(parseInt(document.getElementsByName('arrival_' + i)[0].value));
             bursts.push(parseInt(document.getElementsByName('burst_' + i)[0].value));
+            priorities.push(parseInt(document.getElementsByName('priority_' + i)[0].value));
         }
         let processes = [];
         for (let i = 0; i < n; i++) {
-            processes.push(new Proceso(i+1, arrivals[i], bursts[i]));
+            processes.push(new ProcesoCola(i+1, arrivals[i], bursts[i], priorities[i]));
         }
-        let scheduler = new FCFSScheduler(processes);
+        // Tomar quantum del input del usuario
+        let quantumInput = document.getElementById('quantum');
+        let quantum = quantumInput ? parseInt(quantumInput.value) : 3;
+        if (isNaN(quantum) || quantum < 1) quantum = 3;
+        let scheduler = new ColasScheduler(processes, quantum);
         let {resultados, stateTimeline, ganttCSV} = scheduler.ejecutar();
         // Calcular FI real por la celda 'F'
         let fiPorPid = {};
@@ -148,7 +192,7 @@ const FCFSApp = (function() {
         // Mostrar Gantt como tabla coloreada
         mostrarGantt(stateTimeline, processes);
         // Mostrar CSV como tabla
-        mostrarCSV(ganttCSV, processes, resultados, act, awt, arrivals, bursts, fiPorPid);
+        mostrarCSV(ganttCSV, processes, quantum, resultados, act, awt, arrivals, bursts, fiPorPid);
         document.getElementById('resultados').style.display = '';
     }
 
@@ -170,13 +214,14 @@ const FCFSApp = (function() {
         div.innerHTML = html;
     }
 
-    function mostrarCSV(csv, processes, resultados, act, awt, arrivals, bursts, fiPorPid) {
+    function mostrarCSV(csv, processes, quantum, resultados, act, awt, arrivals, bursts, fiPorPid) {
         // Construir cabecera de datos para CSV/Excel
         let entrada = [['Datos de entrada:']];
-        entrada.push(['PID', 'Llegada', 'Ejecución']);
+        entrada.push(['PID', 'Llegada', 'Ejecución', 'Prioridad']);
         processes.forEach((p, i) => {
-            entrada.push([`P${p.pid}`, arrivals[i], bursts[i]]);
+            entrada.push([`P${p.pid}`, arrivals[i], bursts[i], p.priority]);
         });
+        entrada.push(['Quantum usado:', quantum]);
         entrada.push(['']);
         entrada.push(['Tabla de resultados:']);
         entrada.push(['PID', 'CT', 'WT', 'CO', 'FI']);
@@ -197,7 +242,7 @@ const FCFSApp = (function() {
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = 'gantt_chart_fcfs.csv';
+            a.download = 'gantt_chart_colas.csv';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
@@ -223,8 +268,6 @@ const FCFSApp = (function() {
                     if (i > 0 && j > 0) {
                         if (cell === 'E') style += 'background:#4caf50;color:#fff;';
                         else if (cell === 'L') style += 'background:#ffc107;color:#000;';
-                        else if (cell === 'F') style += 'background:#e53935;color:#fff;';
-                        else style += 'background:#f5f5f5;';
                     }
                     html += `<td style="${style}">${cell}</td>`;
                 });
@@ -235,7 +278,7 @@ const FCFSApp = (function() {
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
             a.href = url;
-            a.download = 'gantt_chart_fcfs.xls';
+            a.download = 'gantt_chart_colas.xls';
             document.body.appendChild(a);
             a.click();
             setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
@@ -250,6 +293,5 @@ const FCFSApp = (function() {
     };
 })();
 
-document.addEventListener('DOMContentLoaded', FCFSApp.updateTable);
-window.updateTable = FCFSApp.updateTable;
-window.calcular = FCFSApp.calcular;
+// Para integración con el HTML principal
+window.ColasApp = ColasApp;
