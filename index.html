@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calculadora de Gestion de procesos (JS)</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+    <h1 class="mb-4">Calculadora de Gestion de procesos (JS)</h1>
+    <form id="processForm" autocomplete="off" onsubmit="event.preventDefault(); RoundRobinApp.calcular();">
+        <div class="mb-3">
+            <label for="schedulerType" class="form-label">Tipo de planificación:</label>
+            <select id="schedulerType" class="form-select" style="width:220px;display:inline-block;">
+                <option value="rr">Round Robin</option>
+                <option value="fcfs">FCFS</option>
+                <option value="sjf">SJF</option>
+                <option value="colas">Colas de prioridad</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="num_processes" class="form-label">Número de procesos:</label>
+            <input type="number" id="num_processes" min="1" max="10" value="4" class="form-control" style="width:120px;display:inline-block;" title="Número de procesos" placeholder="Nº procesos">
+        </div>
+        <div class="mb-3" id="quantumGroup">
+            <label for="quantum" class="form-label ms-3">Quantum:</label>
+            <input type="number" id="quantum" min="1" max="20" value="3" class="form-control" style="width:120px;display:inline-block;" title="Quantum" placeholder="Quantum">
+        </div>
+        <button type="submit" class="btn btn-primary">Calcular</button>
+        <div class="excel-table">
+            <table class="table table-bordered align-middle" id="processTable">
+                <thead class="table-light">
+                <tr>
+                    <th>PID</th>
+                    <th>Tiempo de llegada</th>
+                    <th>Tiempo de ejecución</th>
+                    <!-- La columna de prioridad se agrega dinámicamente en ColasApp si corresponde -->
+                </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </form>
+
+    <div id="resultados" style="display:none;">
+        <hr>
+        <h3>Resultados</h3>
+        <div class="mb-3">
+            <strong>Quantum óptimo:</strong> <span id="quantumOptimo"></span>
+        </div>
+        <div>
+            <strong>Comparativa de Quantum y su AWT:</strong>
+            <table class="table table-sm table-striped w-auto" id="tablaComparativa">
+                <thead><tr><th>Quantum</th><th>AWT</th><th>ACT</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div>
+            <strong>Tabla de resultados:</strong>
+            <table class="table table-bordered w-auto" id="tablaResultados">
+                <thead><tr><th>PID</th><th>CT</th><th>WT</th><th>CO</th><th>FI</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <div>
+                <strong>T. medio de CT (ACT):</strong> <span id="act"></span><br>
+                <strong>T. medio de WT (AWT):</strong> <span id="awt"></span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <strong>Gantt Chart:</strong><br>
+            <div id="ganttChart"></div>
+        </div>
+        <div class="csv-table mt-4">
+            <strong>CSV (Gantt como tabla):</strong>
+            <button id="downloadCSV" class="btn btn-success btn-sm mb-2">Descargar CSV</button>
+            <div id="csvTable"></div>
+            <strong>EXCEL (Gantt como tabla):</strong>
+            <button id="downloadExcel" class="btn btn-primary btn-sm mb-2">Descargar Excel</button>
+        </div>
+    </div>
+</div>
+<script src="colas.js"></script>
+<script src="script.js"></script>
+<script src="fcfs.js"></script>
+<script src="SJF.js"></script>
+<script>
+const schedulerTypeSelect = document.getElementById('schedulerType');
+const processForm = document.getElementById('processForm');
+const quantumGroup = document.getElementById('quantumGroup');
+const quantumInput = document.getElementById('quantum');
+const tablaComparativa = document.getElementById('tablaComparativa');
+const quantumOptimo = document.getElementById('quantumOptimo');
+
+function setAppByType() {
+    const type = schedulerTypeSelect.value;
+    if (type === 'fcfs') {
+        processForm.onsubmit = function(e) { e.preventDefault(); FCFSApp.calcular(); };
+        window.updateTable = FCFSApp.updateTable;
+        window.calcular = FCFSApp.calcular;
+        FCFSApp.updateTable();
+        quantumGroup.style.display = 'none';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else if (type === 'sjf') {
+        processForm.onsubmit = function(e) { e.preventDefault(); SJFApp.calcular(); };
+        window.updateTable = SJFApp.updateTable;
+        window.calcular = SJFApp.calcular;
+        SJFApp.updateTable();
+        quantumGroup.style.display = 'none';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else if (type === 'colas') {
+        processForm.onsubmit = function(e) { e.preventDefault(); ColasApp.calcular(); };
+        window.updateTable = ColasApp.updateTable;
+        window.calcular = ColasApp.calcular;
+        ColasApp.updateTable();
+        quantumGroup.style.display = '';
+        if (tablaComparativa) tablaComparativa.style.display = 'none';
+        if (quantumOptimo) quantumOptimo.textContent = '';
+    } else {
+        processForm.onsubmit = function(e) { e.preventDefault(); RoundRobinApp.calcular(); };
+        window.updateTable = RoundRobinApp.updateTable;
+        window.calcular = RoundRobinApp.calcular;
+        RoundRobinApp.updateTable();
+        quantumGroup.style.display = '';
+        if (tablaComparativa) tablaComparativa.style.display = '';
+    }
+}
+
+// Validación de entradas para ambos métodos
+function validarEntradas() {
+    const n = parseInt(document.getElementById('num_processes').value);
+    if (isNaN(n) || n < 1 || n > 10) {
+        alert('El número de procesos debe estar entre 1 y 10.');
+        return false;
+    }
+    for (let i = 0; i < n; i++) {
+        const llegada = document.getElementsByName('arrival_' + i)[0].value;
+        const burst = document.getElementsByName('burst_' + i)[0].value;
+        if (llegada === '' || isNaN(llegada) || llegada < 0) {
+            alert('El tiempo de llegada debe ser un número mayor o igual a 0.');
+            return false;
+        }
+        if (burst === '' || isNaN(burst) || burst < 1) {
+            alert('El tiempo de ejecución debe ser un número mayor o igual a 1.');
+            return false;
+        }
+    }
+    if (schedulerTypeSelect.value === 'rr') {
+        const quantum = quantumInput.value;
+        if (quantum === '' || isNaN(quantum) || quantum < 1) {
+            alert('El quantum debe ser un número mayor o igual a 1.');
+            return false;
+        }
+    }
+    return true;
+}
+
+// Interceptar el botón Calcular para validar antes de ejecutar
+const calcularBtn = document.querySelector('button[type="submit"]');
+if (calcularBtn) {
+    calcularBtn.addEventListener('click', function(e) {
+        if (!validarEntradas()) {
+            e.preventDefault();
+            return false;
+        }
+        // El submit real lo hace el onsubmit del form
+    });
+}
+
+// Asegurar que la tabla de procesos se actualice al cambiar el número de procesos
+const numProcInput = document.getElementById('num_processes');
+if (numProcInput) {
+    numProcInput.addEventListener('change', function() {
+        if (typeof window.updateTable === 'function') window.updateTable();
+    });
+}
+
+// Asegurar que la tabla de procesos se actualice al cambiar el tipo de planificación
+schedulerTypeSelect.addEventListener('change', function() {
+    setAppByType();
+    if (typeof window.updateTable === 'function') window.updateTable();
+});
+document.addEventListener('DOMContentLoaded', function() {
+    setAppByType();
+    if (typeof window.updateTable === 'function') window.updateTable();
+});
+</script>
+</body>
+</html>
